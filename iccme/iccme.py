@@ -1,5 +1,5 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import configparser
 import os
 from pathlib import Path
@@ -14,7 +14,7 @@ class ICCMe:
     def __init__(self, icc_path : str):
         with open(icc_path, "rb") as icc_file:
             self.icc_data = icc_file.read()
-    
+
     def apply_icc_to_image(self, image_path : Path) -> None:
         if not image_path.exists():
             raise ValueError(f"Image not found: {image_path}")
@@ -53,7 +53,7 @@ def cli():
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
-    
+
     config_path = find_config_path()
     # need the parent to know where to reference a relative path in the config
     config_path_parent = config_path.parent
@@ -69,8 +69,8 @@ def cli():
 
     iccme = ICCMe(icc_path)
 
-    # run in parallel, up to 10 files at a time
-    with ThreadPoolExecutor(max_workers=10) as ex:
+    # run in parallel (ProcessPoolExecutor works in MacOS, Threads are broken)
+    with ProcessPoolExecutor() as ex:
         ex.map(iccme.apply_icc_to_image, (Path(x) for x in args.images))
 
 
