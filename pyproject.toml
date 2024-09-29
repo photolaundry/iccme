@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "iccme"
-version = "0.2.0"
+version = "0.3.0"
 description = "batch apply ICC profiles to images"
 authors = ["Bobo Li <bobo@photolaundrysf.com>"]
 readme = "README.md"

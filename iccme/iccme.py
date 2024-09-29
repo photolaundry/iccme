@@ -1,5 +1,5 @@
 import argparse
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 import configparser
 import os
 from pathlib import Path
@@ -69,8 +69,13 @@ def cli():
 
     iccme = ICCMe(icc_path)
 
-    # run in parallel (ProcessPoolExecutor works in MacOS, Threads are broken)
-    with ProcessPoolExecutor() as ex:
+    # turn off IM/Wand's thread pooling, it can cause crashes when used with
+    # Python's ThreadPoolExecutor
+    from wand.resource import genesis, limits
+    genesis()
+    limits['thread'] = 1
+
+    with ThreadPoolExecutor() as ex:
         ex.map(iccme.apply_icc_to_image, (Path(x) for x in args.images))
 
 
