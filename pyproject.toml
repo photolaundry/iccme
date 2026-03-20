@@ -1,18 +1,19 @@
-[tool.poetry]
+[project]
 name = "iccme"
 version = "0.3.0"
 description = "batch apply ICC profiles to images"
-authors = ["Bobo Li <bobo@photolaundrysf.com>"]
+authors = [
+  { name = "Bobo Li", email = "bobo@photolaundrysf.com" },
+]
 readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "wand>=0.6.13"
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-Wand = "^0.6.13"
-
-
-[tool.poetry.scripts]
-iccme = "iccme.iccme:cli"
+[project.scripts]
+iccme = "iccme:cli"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
