@@ -1,8 +1,9 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import configparser
 import os
 from pathlib import Path
+import sys
 
 from wand.image import Image
 
@@ -15,17 +16,27 @@ class ICCMe:
         with open(icc_path, "rb") as icc_file:
             self.icc_data = icc_file.read()
 
-    def apply_icc_to_image(self, image_path : Path) -> None:
+    def apply_icc_to_image(self, image_path : Path) -> bool:
         if not image_path.exists():
             raise ValueError(f"Image not found: {image_path}")
+        image_stem = image_path.stem
+        tmp_path = image_path.with_stem(f"{image_stem}.tmp")
 
-        print(f"  Processing {image_path}...")
-        with Image(filename=image_path) as image:
-            image.profiles["icc"] = self.icc_data
-            image.save(filename=image_path)
+        print(f"Processing {image_path}...")
+        try:
+            with Image(filename=image_path) as image:
+                image.profiles["icc"] = self.icc_data
+                image.save(filename=tmp_path)
+
+            os.replace(tmp_path, image_path)
+        except Exception as exc:
+            print(f"  failed on {image_path} with error:")
+            print(exc)
+            return False
+        return True
 
 
-def find_config_path() -> Path:
+def find_config_path() -> Path | None:
     # search cwd, then homedir, then start searching parent directories for the
     # .iccme config file
     all_config_locations =  [Path.cwd(), Path.home()] + list(Path.cwd().parents)
@@ -33,9 +44,10 @@ def find_config_path() -> Path:
         possible_path = d / CONFIG_FILENAME
         if possible_path.exists():
             return possible_path
+    return None
 
 
-def cli():
+def cli() -> int:
     parser = argparse.ArgumentParser(
         description="Batch apply an ICC profile to images.")
     parser.add_argument(
@@ -55,10 +67,13 @@ def cli():
     config = configparser.ConfigParser()
 
     config_path = find_config_path()
+    if not config_path:
+        print("Couldn't find an ICCME config!")
+        return -1
     # need the parent to know where to reference a relative path in the config
     config_path_parent = config_path.parent
 
-    config.read(find_config_path())
+    config.read(str(find_config_path()))
     if args.profile:
         icc_path = args.profile
     else:
@@ -67,17 +82,15 @@ def cli():
     if not icc_path.exists():
         raise ValueError(f"ICC profile not found: {icc_path}")
 
-    iccme = ICCMe(icc_path)
+    iccme = ICCMe(str(icc_path))
 
-    # turn off IM/Wand's thread pooling, it can cause crashes when used with
-    # Python's ThreadPoolExecutor
-    from wand.resource import genesis, limits
-    genesis()
-    limits['thread'] = 1
-
-    with ThreadPoolExecutor() as ex:
-        ex.map(iccme.apply_icc_to_image, (Path(x) for x in args.images))
+    with ProcessPoolExecutor() as ex:
+        if not all(ex.map(iccme.apply_icc_to_image, (Path(x) for x in args.images))):
+            print("Some conversions failed!")
+            return -1
+    print("All done!")
+    return 0
 
 
 if __name__ == "__main__":
-    cli()
+    sys.exit(cli())
